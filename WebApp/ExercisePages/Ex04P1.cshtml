@@ -1,9 +1,13 @@
 ﻿@{
     Layout = "~/_Layout.cshtml";
-    Page.Title = string.Format("Razor - {0}",
-        "Ex04 Page 01");
+    Page.Title = string.Format("Razor - {0}", "Ex04 Page 1");
 
-    
+    var message = "";
+    var color = "";
+    var partialstring = Request.Form["partialString"];
+    var choice = Request.Form["dropdown"];
+    var thebutton = Request.Form["theButton"];
+    IEnumerable<dynamic> partialstringalbumresults = null;
 }
 
 @section banner {
@@ -15,3 +19,119 @@
         </div>
     </div>
 }
+
+@if (!IsPost) // NO Buttons Pressed
+{
+    partialstring = "";
+}
+else // Buttons Pressed
+{
+    if (thebutton.Equals("clear"))
+    {
+        message = "Reset button pressed";
+        color = "color:green";
+        partialstring = "";
+    }
+    else if (thebutton.Equals("submit"))
+    {
+        if (partialstring.IsEmpty())
+        {
+            message = "Enter an album title (or partial title).";
+            color = "color:firebrick";
+        }
+        else
+        {
+            var db = Database.Open("CHINOOKDB");
+
+            string partialstringquery = "SELECT AlbumId, Title "
+                + "FROM Albums "
+                + "WHERE Title LIKE @0 "
+                + "ORDER BY Title";
+            var partialstringforquery = "%" + partialstring + "%";
+            partialstringalbumresults = db.Query(partialstringquery, partialstringforquery);
+            if (partialstringalbumresults.Count() == 0)
+            {
+                message = "No albums found";
+                color = "color:firebrick";
+                partialstring = "";
+            }
+        }
+    }
+    else if (thebutton.Equals("fetch"))
+    {
+        var db = Database.Open("CHINOOKDB");
+        var albumquery = "SELECT AlbumId, Title "
+            + "FROM Albums "
+            + "WHERE AlbumId = @0";
+        var albumresults = db.Query(albumquery, choice);
+        if (albumresults.Count() == 0)
+        {
+            message = "No artist found!";
+            color = "color:firebrick";
+        }
+        else
+        {
+            Response.Redirect("Ex04P2.cshtml?pid=" + choice);
+        }
+    }
+}
+
+<form id="theform" method="post">
+    <div class="row">
+        <div class="col-4 text-right">
+            <label id="lblartistArg" for="artistArg">Enter an Album Title:</label>
+        </div>
+        <div class="col-8 text-left">
+            <input type="text" id="partialString" name="partialString"
+                   value="@partialstring" placeholder="partial string ..." />&nbsp;&nbsp;
+            <button type="submit" id="theButton" name="theButton"
+                    value="submit" class="btn btn-light">
+                Fetch
+            </button>&nbsp;&nbsp;
+            <button type="submit" id="theButton" name="theButton"
+                    value="clear" class="btn btn-light">
+                Reset
+            </button>
+        </div>
+    </div>
+    <br />
+    <div class="row">
+        <div class="col-4 text-right">
+            <label class="label" for="CategoryList">Choose an Album:</label>&nbsp;&nbsp;
+        </div>
+        <div class="col-8 text-left">
+            <select id="dropdown" name="dropdown">
+                <option value="0">select ...</option>
+                @if (partialstringalbumresults != null)
+                {
+                    foreach (var item in partialstringalbumresults)
+                    {
+                        if (choice == item.AlbumID.ToString())
+                        {
+                            <option value="@item.AlbumID" selected>@item.Title</option>
+                        }
+                        else
+                        {
+                            <option value="@item.AlbumID">@item.Title</option>
+                        }
+                    }
+                }
+            </select>&nbsp;&nbsp;
+            <button type="submit" id="theButton" name="theButton" value="fetch"
+                    class="btn btn-light">
+                Fetch
+            </button>
+        </div>
+    </div>
+    <br />
+    <div class="row">
+        <div class="col-4">
+        </div>
+        <div class="col-8 text-left">
+            <p style=@color>
+                @message
+            </p>
+        </div>
+    </div>
+</form>
+

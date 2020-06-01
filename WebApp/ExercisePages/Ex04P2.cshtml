@@ -1,10 +1,28 @@
 ﻿@{
     Layout = "~/_Layout.cshtml";
-    Page.Title = string.Format("Razor - {0}",
-        "Ex04 Page 02");
+    Page.Title = string.Format("Razor - {0}", "Ex04 Page 2");
 
+    var pid = Request.QueryString["pid"];
+    if (pid.IsEmpty())
+    {
+        Response.Redirect("Ex04P1.cshtml");
+    }
+    var message = "";
+    var color = "";
+    var albumID = Request.Form["AlbumID"];
+    var title = Request.Form["Title"];
+    var artistID = Request.Form["ArtistList"];
+    var releaseYear = Request.Form["ReleaseYear"];
+    var releaseLabel = Request.Form["ReleaseLabel"];
+    var thebutton = Request.Form["theButton"];
+    bool updateDeleteEnabled = true;
 
-    
+    var db = Database.Open("CHINOOKDB");
+
+    var artistStatement = "SELECT ArtistID, Name "
+                        + "FROM Artists "
+                        + "ORDER BY Name";
+    var queryCategories = db.Query(artistStatement);
 }
 
 @section banner {
@@ -16,3 +34,286 @@
         </div>
     </div>
 }
+
+@if (!IsPost) // NO Buttons Pressed
+{
+    albumID = pid;
+    releaseLabel = "0";
+    var queryStatement = "SELECT AlbumID, Title, ArtistID, "
+                            + "ReleaseYear, ReleaseLabel "
+                            + "FROM Albums "
+                            + "WHERE AlbumID = @0";
+    var queryAlbums = db.QuerySingle(queryStatement, pid);
+    if (queryAlbums == null)
+    {
+        message = "Record NOT found";
+        color = "color:firebrick";
+    }
+    else
+    {
+        albumID = queryAlbums.AlbumID.ToString();
+        title = queryAlbums.Title;
+        artistID = queryAlbums.ArtistID == null ? "0" : queryAlbums.ArtistID.ToString();
+        releaseYear = queryAlbums.ReleaseYear == null ? "" : queryAlbums.ReleaseYear.ToString();
+        releaseLabel = queryAlbums.ReleaseLabel.ToString();
+    }
+}
+else // Buttons Pressed
+{
+    try
+    {
+
+        if (thebutton.Equals("back"))
+        {
+            Response.Redirect("Ex04P1.cshtml");
+        }
+        else if (thebutton.Equals("clear"))
+        {
+            albumID = "";
+            title = "";
+            artistID = "0";
+            releaseYear = "";
+            releaseLabel = "";
+            updateDeleteEnabled = false;
+        }
+        else if (thebutton.Equals("add"))
+        {
+            if (title == "")
+            {
+                message = "Album title is required";
+                color = "color:firebrick";
+                updateDeleteEnabled = false;
+            }
+            else if (artistID == "0")
+            {
+                message = "Artist is required";
+                color = "color:firebrick";
+                updateDeleteEnabled = false;
+            }
+            else if (releaseYear == "")
+            {
+                message = "Release year is required";
+                color = "color:firebrick";
+                updateDeleteEnabled = false;
+            }
+
+            else if (int.Parse(releaseYear) < 1950 || int.Parse(releaseYear) > DateTime.Today.Year)
+            {
+                message = "Release Year must be between 1950 and this year";
+                color = "color:firebrick";
+            }
+
+            else if (releaseLabel == "")
+            {
+                message = "Release label is required";
+                color = "color:firebrick";
+                updateDeleteEnabled = false;
+            }
+            else
+            {
+                var inscommand = "INSERT INTO Albums "
+                    + "(Title, ArtistID, ReleaseYear, "
+                    + "ReleaseLabel) "
+                    + "VALUES(@0, @1, @2, @3)";
+                var rowsaffected = db.Execute(inscommand, title,
+                    artistID.Equals("0") ? null : artistID,
+                    releaseYear,
+                    releaseLabel);
+                if (rowsaffected > 0)
+                {
+                    decimal newid = db.GetLastInsertId();
+                    albumID = newid.ToString();
+                    message = "Record ADDED";
+                    color = "color:green";
+                    updateDeleteEnabled = true;
+                }
+                else
+                {
+                    message = "Record NOT found";
+                    color = "color:firebrick";
+                }
+            }
+        }
+        else if (thebutton.Equals("update"))
+        {
+            if (title == "")
+            {
+                message = "Album title is required";
+                color = "color:firebrick";
+            }
+            else if (artistID == "0")
+            {
+                message = "Artist is required";
+                color = "color:firebrick";
+            }
+            else if (releaseYear == "")
+            {
+                message = "Release year is required";
+                color = "color:firebrick";
+            }
+
+            else if (int.Parse(releaseYear) < 1950 || int.Parse(releaseYear) > DateTime.Today.Year)
+            {
+                message = "Release Year must be between 1950 and this year";
+                color = "color:firebrick";
+            }
+
+            else if (releaseLabel == "")
+            {
+                message = "Release Ylabel is required";
+                color = "color:firebrick";
+            }
+
+            else
+            {
+                var updatecommand = "UPDATE Albums SET "
+                    + "Title = @0, "
+                    + "ArtistID = @1, "
+                    + "ReleaseYear = @2, "
+                    + "ReleaseLabel = @3 "
+                    + "WHERE AlbumID = @4";
+                var rowsaffected = db.Execute(updatecommand, title,
+                    artistID.Equals("0") ? null : artistID,
+                    releaseYear,
+                    releaseLabel,
+                    albumID);
+                if (rowsaffected > 0)
+                {
+                    message = "Record UPDATED";
+                    color = "color:green";
+                }
+                else
+                {
+                    message = "Record NOT found";
+                    color = "color:firebrick";
+                }
+            }
+        }
+        else if (thebutton.Equals("delete"))
+        {
+            var deleteStatement = "Delete Albums WHERE AlbumID = @0";
+            var rowsaffected = db.Execute(deleteStatement, albumID);
+            if (rowsaffected > 0)
+            {
+                message = "Record DELETED";
+                color = "color:green";
+                albumID = "";
+                title = "";
+                artistID = "0";
+                releaseYear = "";
+                releaseLabel = "";
+                updateDeleteEnabled = false;
+            }
+            else
+            {
+                message = "Record NOT found";
+                color = "color:firebrick";
+            }
+        }
+    }
+    catch (Exception ex)
+    {
+        message = "Processing error: " + @ex.Message;
+        color = "color:firebrick";
+    }
+}
+
+<form id="theForm" action="" method="post">
+    <div class="row">
+        <div class="col-4 text-right">
+            <label id="lblAlbumID" for="albumID">Album ID</label>
+        </div>
+        <div class="col-8 text-left">
+            <input type="text" name="albumID" value="@albumID" readonly />
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-4 text-right">
+            <label id="lblTitle" for="title">Album Title</label>
+        </div>
+        <div class="col-8 text-left">
+            <input type="text" name="title" value="@title" />
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-4 text-right">
+            <label id="lblartistList" for="artistList">Artist</label>
+        </div>
+        <div class="col-8 text-left">
+            <select name="artistList">
+                <option value="0">select...</option>
+                @foreach (var acollectionrow in queryCategories)
+                {
+                    if (acollectionrow.ArtistID.ToString() == artistID)
+                    {
+                        <option value="@acollectionrow[0]" selected>@acollectionrow[1]</option>
+                    }
+                    else
+                    {
+                        <option value="@acollectionrow[0]">@acollectionrow[1]</option>
+                    }
+                }
+            </select>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-4 text-right">
+            <label id="lblreleaseYear" for="releaseYear">Release Year</label>
+        </div>
+        <div class="col-8 text-left">
+            <input type="number" name="releaseYear" value="@releaseYear" step="0.01" />
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-4 text-right">
+            <label id="lblreleaseLabel" for="releaseLabel">Release Label</label>
+        </div>
+        <div class="col-8 text-left">
+            <input type="text" name="releaseLabel" value="@releaseLabel" />
+        </div>
+    </div>
+
+    <br />
+    <div class="row">
+        <div class="col-4">
+        </div>
+        <div class="col-8 text-left">
+            <button type="submit" name="theButton" id="theCancel" class="btn btn-light" formnovalidate
+                    value="back">
+                Back
+            </button>&nbsp;
+            <button type="submit" name="theButton" id="theClear" class="btn btn-light"
+                    value="clear">
+                Clear
+            </button>&nbsp;
+            <button type="submit" name="theButton" id="theAdd" class="btn btn-light"
+                    value="add">
+                Add
+            </button>&nbsp;
+            <button type="submit" name="theButton" id="theUpdate" class="btn btn-light"
+                    @(updateDeleteEnabled ? "" : "disabled") value="update">
+                Update
+            </button>&nbsp;
+            <button type="submit" name="theButton" id="theDelete" class="btn btn-light"
+                    @(updateDeleteEnabled ? "" : "disabled") value="delete">
+                Delete
+            </button>
+        </div>
+    </div>
+    <script type="text/javascript">
+        document.getElementById("theDelete").onclick = ConfirmDelete;
+        function ConfirmDelete() {
+            return confirm("Are you sure you want to DELETE @title?");
+        }
+    </script>
+</form>
+<br />
+<div class="row">
+    <div class="col-4">
+    </div>
+    <div class="col-8 text-left">
+        <p style=@color>
+            @message
+        </p>
+    </div>
+</div>
